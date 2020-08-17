@@ -41,7 +41,7 @@
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>dependency/</classpathPrefix>
                             <mainClass>${mainClass}</mainClass>
-                             <mainClass>com.wtc.fixme_market.fixme_market</mainClass>
+                             <mainClass>com.wtc.FixmeMarket.FixmeMarket</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

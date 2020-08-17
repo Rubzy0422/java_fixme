@@ -1,3 +1,6 @@
 .classpath
 .project
 .settings
+/fixme_router/target/
+/fixme_broker/target/
+/fixme_market/target/

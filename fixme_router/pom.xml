@@ -17,6 +17,13 @@
     <artifactId>fixme_router</artifactId>
     <version>1.0</version>
 
+    <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.uuid</groupId>
+            <artifactId>java-uuid-generator</artifactId>
+            <version>3.1.4</version>
+        </dependency>
+    </dependencies>
 
     <build>
         <plugins>
@@ -41,7 +48,7 @@
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>dependency/</classpathPrefix>
                             <mainClass>${mainClass}</mainClass>
-                             <mainClass>com.wtc.fixme_router.fixme_router</mainClass>
+                             <mainClass>com.wtc.FixmeRouter.FixmeRouter</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

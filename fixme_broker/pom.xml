@@ -41,7 +41,7 @@
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>dependency/</classpathPrefix>
                             <mainClass>${mainClass}</mainClass>
-                             <mainClass>com.wtc.fixme_broker.fixme_broker</mainClass>
+                             <mainClass>com.wtc.FixmeBroker.FixmeBroker</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -63,6 +63,8 @@
                     </execution>
                 </executions>
             </plugin>
+
+            
         </plugins>
     </build>
 
