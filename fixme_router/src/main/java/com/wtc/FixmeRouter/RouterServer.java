@@ -37,7 +37,7 @@ public class RouterServer {
     static Set<SelectionKey> selectedKeys;
     Iterator<SelectionKey> iterator;
     SocketChannel sc;
-    static HashMap<String, SocketChannel> scl;
+    
     ByteBuffer bb;
     String result;
     String sUUID;
@@ -47,7 +47,7 @@ public class RouterServer {
         try {
             host = InetAddress.getByName(_host);
             selector = Selector.open();
-            scl = new HashMap<>();
+            
             serverSocketChannel = ServerSocketChannel.open();
             serverSocketChannel.configureBlocking(false);
             serverSocketChannel.bind(new InetSocketAddress(host, port));
@@ -96,7 +96,7 @@ public class RouterServer {
         else
             sUUID = 'B' + Integer.toString(i++);
         sc.write(ByteBuffer.wrap(sUUID.getBytes()));
-        scl.put(sUUID, sc);
+        FixmeRouter.scl.put(sUUID, sc);
         log.info("Connection Accepted: " + sUUID + sc.getRemoteAddress() + "  " + sUUID + "\n");
     }
 
@@ -124,14 +124,14 @@ public class RouterServer {
             System.out.println(_UUID + " - [" + messString + ']');
      
 
-            for ( String key : scl.keySet() ) {
+            for ( String key : FixmeRouter.scl.keySet() ) {
                 System.out.println( key );
             }
 
-            if (messString.equals("M50001")) {
+            if (messString.length() == 6) {
                 SocketChannel _sc;
                 // SEND TO BROKER FROM MARKET 
-                _sc = scl.get(messString);    
+                _sc = FixmeRouter.scl.get(messString);    
                 ByteBuffer bb = ByteBuffer.wrap(messString.getBytes());
                 _sc.write(bb);
                 _sc = null;

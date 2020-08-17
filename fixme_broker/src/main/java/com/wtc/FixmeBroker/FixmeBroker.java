@@ -1,27 +1,37 @@
 package com.wtc.FixmeBroker;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.UnknownHostException;
+
 /**
  * @author Ruben
  */
 public class FixmeBroker {
 
     public FixmeBroker() {
-        // BrokerChain calc1 = new AddNumbers();
-        // BrokerChain calc2 = new SubtractNumbers();
-        // BrokerChain calc3 = new MultiplyNumbers();
-        // BrokerChain calc4 = new DivideNumbers();
-        
-        // calc1.setNext(calc2);
-        // calc2.setNext(calc3);
-        // calc3.setNext(calc4);
-        
-        // Numbers request = new Numbers(4, 2, "Add");
-        
-        // calc1.calculate(request);
-        new BrokerClient("localhost");
+
+            System.out.println("Please Select a host:");
+            try {
+                BufferedReader buffreader = new BufferedReader(new InputStreamReader(System.in));
+                String host = buffreader.readLine().trim();
+                if (!host.isEmpty())
+                {
+                    new BrokerClient(host);
+                }
+            }
+            catch (UnknownHostException ex)
+            {
+                System.out.println("WOAH ... You messed up..." + ex.getMessage());
+            }
+            catch (IOException ex)
+            {
+                System.out.println("WOAH ... You messed up..." + ex.getMessage());
+            }
     }
 
-    public static void main(String args[]) {
+    public static void main(String args[]) throws UnknownHostException, IOException {
         new FixmeBroker();
     }
 

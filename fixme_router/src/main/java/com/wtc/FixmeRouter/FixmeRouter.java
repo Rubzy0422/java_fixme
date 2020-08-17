@@ -1,5 +1,7 @@
 package com.wtc.FixmeRouter;
 
+import java.nio.channels.SocketChannel;
+import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -12,8 +14,10 @@ import lombok.extern.log4j.Log4j;
 // Create 2 Executor Services (1. Market on Port 5001, 2. For Broker on Port 5000)
 @Log4j
 public class FixmeRouter {
-
+    static HashMap<String, SocketChannel> scl;
+    
     public FixmeRouter() {
+        scl = new HashMap<>();
         // Listen for Market
         Runnable MarketServer = new Runnable(){
             public void run(){
