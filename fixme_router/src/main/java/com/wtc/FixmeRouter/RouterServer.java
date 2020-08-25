@@ -20,6 +20,9 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
 
+import com.wtc.FixmeRouter.RouterChain.ClientChain;
+import com.wtc.FixmeRouter.RouterChain.ClientMessage;
+
 import lombok.extern.log4j.Log4j;
 
 /**
@@ -37,7 +40,7 @@ public class RouterServer {
     static Set<SelectionKey> selectedKeys;
     Iterator<SelectionKey> iterator;
     SocketChannel sc;
-    
+    ClientChain cc;
     ByteBuffer bb;
     String result;
     String sUUID;
@@ -47,6 +50,7 @@ public class RouterServer {
         try {
             host = InetAddress.getByName(_host);
             selector = Selector.open();
+            cc = new ClientChain();
             
             serverSocketChannel = ServerSocketChannel.open();
             serverSocketChannel.configureBlocking(false);
@@ -122,26 +126,7 @@ public class RouterServer {
             String _UUID = result.substring(1, 7);
             String messString = result.substring(9);
             System.out.println(_UUID + " - [" + messString + ']');
-     
-
-            for ( String key : FixmeRouter.scl.keySet() ) {
-                System.out.println( key );
-            }
-
-            if (messString.length() == 6) {
-                SocketChannel _sc;
-                // SEND TO BROKER FROM MARKET 
-                _sc = FixmeRouter.scl.get(messString);    
-                ByteBuffer bb = ByteBuffer.wrap(messString.getBytes());
-                _sc.write(bb);
-                _sc = null;
-            }
-
-            if (result.equals("[M5000] STOPSERVER PASS:Password!@123"))
-            {
-                runServer = false;
-                System.exit(0);
-            }
+            cc.process(new ClientMessage(_UUID, messString));
         }
         if (result.length() <= 0) {
             sc.close();

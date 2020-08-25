@@ -33,11 +33,13 @@ public class MarketClient {
     protected SelectionKey key = null;
     private  InputThread thread;
     private ExecutorService InputThread;
+    MarketObj _MarketClient;
 
-    MarketClient( String ip) throws UnknownHostException, IOException {
-         InetSocketAddress addr = new InetSocketAddress(InetAddress.getByName(ip), 5001);
-         Selector selector = Selector.open();
-         SocketChannel sc = SocketChannel.open();
+    MarketClient(String ip, MarketObj MarketClient) throws UnknownHostException, IOException {
+        this._MarketClient = MarketClient;
+        InetSocketAddress addr = new InetSocketAddress(InetAddress.getByName(ip), 5001);
+        Selector selector = Selector.open();
+        SocketChannel sc = SocketChannel.open();
 
         // Set Socket Options
         sc.configureBlocking(false);
@@ -60,27 +62,6 @@ public class MarketClient {
         sc.close();
     }
 
-    // static
-    public Boolean processConnect( SelectionKey key) {
-         SocketChannel sc = (SocketChannel) key.channel();
-        try {
-            while (sc.isConnectionPending()) {
-                sc.finishConnect();
-            }
-            // SET UUID
-            ByteBuffer bb = ByteBuffer.allocate(1024);
-            sc.read(bb);
-            this.UUID = new String(bb.array()).trim();
-            log.info(this.UUID);
-
-        } catch ( IOException e) {
-            key.cancel();
-            e.printStackTrace();
-            return false;
-        }
-        return true;
-    }
-
     // public static Boolean processReadySet(Set readySet) throws Exception {
     public Boolean processReadySet( Set<SelectionKey> readySet) throws IOException {
         Iterator<SelectionKey> iterator = null;
@@ -96,17 +77,23 @@ public class MarketClient {
             }
         }
         if (this.key.isReadable()) {
-             SocketChannel sc = (SocketChannel) this.key.channel();
-             ByteBuffer bb = ByteBuffer.allocate(1024);
+            SocketChannel sc = (SocketChannel) this.key.channel();
+            ByteBuffer bb = ByteBuffer.allocate(1024);
             sc.read(bb);
-             String result = new String(bb.array()).trim();
+            String result = new String(bb.array()).trim();
+
+            // OK SO HERE WE EXECUTE Everything in a Chain of Responsibility thingy
+            // So Up first is to know what this maret name is.
+            // Next We need to parse fix to understand if it is a BUY / a Sell FIX message
+            // Lastly We need to update the Client (via router -- set the ID to be that of broker that sent message (FIX))
+            // In the background on another thread a Market will be changed  + or -  // if - larger than X deregister market
             System.out.println("Message received from Server: " + result + " Message length= " + result.length());
         }
         if (this.key.isWritable()) {
             if (!thread.MsgQueue.isEmpty())
             {
                 String msg = null;
-                 SocketChannel sc = (SocketChannel) key.channel();
+                SocketChannel sc = (SocketChannel) key.channel();
                 ByteBuffer bb = null;
        
                 // Itterate through message Queue and Send them
@@ -127,6 +114,40 @@ public class MarketClient {
             }
         }
         return false;
+    }
+
+        // static
+        public Boolean processConnect( SelectionKey key) {
+            SocketChannel sc = (SocketChannel) key.channel();
+           try {
+               while (sc.isConnectionPending()) {
+                   sc.finishConnect();
+               }
+               // SET UUID
+               ByteBuffer bb = ByteBuffer.allocate(1024);
+               sc.read(bb);
+               this.UUID = new String(bb.array()).trim();
+               log.info(this.UUID);
+   
+           } catch ( IOException e) {
+               key.cancel();
+               e.printStackTrace();
+               return false;
+           }
+           return true;
+       }
+
+    //    OK SO TO BUY SHARES : 
+    public String BuyShares(Instrument ins, int ShareAmount, int Price) {
+        return "NOPE";
+    }
+
+    public String SellShares(Instrument ins, int ShareAmount, int Price) {
+        return "YOu get nothing";
+    }
+
+    public boolean sameName(String Name) {
+        return Name.equals(this._MarketClient.getName());
     }
 }
 

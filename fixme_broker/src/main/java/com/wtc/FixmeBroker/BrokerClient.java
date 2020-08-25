@@ -137,12 +137,38 @@ class InputThread implements Runnable {
 
     @Override
     public void run() {
+        // 8=FIX4.2|9=65|35=D|54=1|38=100|52=20071123-05:30:00.000|55=IBM|40=1|10=000
         String msg;
         while (true) {
             System.out.print("Message: ");
-            try {
+
+            // CALCULATE FIX BODY LENGTH
+            // SET NEW ORDER SINGLE
+            // 35 =  D (New Single order)
+            // 38 100  Quantity
+
+            // COMMANDS :
+            // BUY MARKET AMOUNT PRICE 
+
+            // SELL MARKET AMOUNT PRICE
+
+
+            // 8=FIX.4.4| 9=(BODYLENGTH) 35= (Message Type), 49 (SenderCompID), 56 (TargetCompID)
+
+            // Body length is the character count starting at tag 35 (included) all the way to tag 10 (excluded). SOH delimiters do count in body length.
+            // For Example: (SOH have been replaced by'|')
+
+            // 8=FIX.4.2|9=65|35=A|49=SERVER|56=CLIENT|34=177|52=20090107-18:15:16|98=0|108=30|10=062|
+            //      0   + 0  + 5  +   10    +   10    +  7   +        21          + 5  +  7   +   0    = 65
+
+            // Checksum = All chars except last % 256 = 
+
+           try {
+                
                 msg = input.readLine();
-                MsgQueue.add(msg);
+                
+                String fixMsg = "8=FIX4.2|9=" + msg.length() + '|' + msg + "|10=";
+                MsgQueue.add(fixMsg);
             } catch ( IOException e) {
                log.error(e.getMessage());
             }
