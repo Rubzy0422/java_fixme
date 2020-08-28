@@ -5,9 +5,12 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.UnknownHostException;
 
+import lombok.extern.log4j.Log4j;
+
 /**
  * @author Ruben
  */
+@Log4j
 public class FixmeBroker {
 
     public FixmeBroker() {
@@ -23,11 +26,11 @@ public class FixmeBroker {
             }
             catch (UnknownHostException ex)
             {
-                System.out.println("WOAH ... You messed up..." + ex.getMessage());
+                log.error(ex.getMessage());
             }
             catch (IOException ex)
             {
-                System.out.println("WOAH ... You messed up..." + ex.getMessage());
+                log.error(ex.getMessage());
             }
     }
 

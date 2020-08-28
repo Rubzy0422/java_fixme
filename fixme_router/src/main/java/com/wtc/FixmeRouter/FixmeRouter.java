@@ -14,10 +14,11 @@ import lombok.extern.log4j.Log4j;
 @Log4j
 public class FixmeRouter {
     static HashMap<String, SocketChannel> scl;
-    
+    static HashMap<String, SocketChannel> MarketNameLinks;
+
     public FixmeRouter() {
         scl = new HashMap<>();
-        // Listen for Market
+        MarketNameLinks = new HashMap<>();
         Runnable MarketServer = new Runnable(){
             public void run(){
                 new RouterServer("localhost", 5001);
@@ -43,9 +44,16 @@ public class FixmeRouter {
         }
     }
 
+    public static HashMap<String, SocketChannel> getScl() {
+        return scl;
+    }
     public static void main(String args[]) {
         new FixmeRouter();
     }
+
+	public static HashMap<String, SocketChannel> getMarketNameLinks() {
+        return MarketNameLinks;
+	}
 
 }
 

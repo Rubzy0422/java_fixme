@@ -16,6 +16,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -31,8 +32,9 @@ import lombok.extern.log4j.Log4j;
 public class MarketClient {
     protected String UUID;
     protected SelectionKey key = null;
-    private  InputThread thread;
+    private InputThread thread;
     private ExecutorService InputThread;
+    private boolean firstConnect = true;
     MarketObj _MarketClient;
 
     MarketClient(String ip, MarketObj MarketClient) throws UnknownHostException, IOException {
@@ -49,11 +51,11 @@ public class MarketClient {
         InputThread = Executors.newSingleThreadExecutor();
         thread = new InputThread();
 
-        // START INPUT THREAD 
+        // START INPUT THREAD
         InputThread.execute(thread);
         while (true) {
             if (selector.select() > 0) {
-                 Boolean doneStatus = processReadySet(selector.selectedKeys());
+                Boolean doneStatus = processReadySet(selector.selectedKeys());
                 if (doneStatus) {
                     break;
                 }
@@ -63,15 +65,15 @@ public class MarketClient {
     }
 
     // public static Boolean processReadySet(Set readySet) throws Exception {
-    public Boolean processReadySet( Set<SelectionKey> readySet) throws IOException {
+    public Boolean processReadySet(Set<SelectionKey> readySet) throws IOException {
         Iterator<SelectionKey> iterator = null;
         iterator = readySet.iterator();
         while (iterator.hasNext()) {
-            this.key = iterator.next(); //(SelectionKey) cast
+            this.key = iterator.next(); // (SelectionKey) cast
             iterator.remove();
         }
         if (this.key.isConnectable()) {
-             Boolean connected = processConnect(this.key);
+            Boolean connected = processConnect(this.key);
             if (!connected) {
                 return true;
             }
@@ -81,43 +83,108 @@ public class MarketClient {
             ByteBuffer bb = ByteBuffer.allocate(1024);
             sc.read(bb);
             String result = new String(bb.array()).trim();
-
-            // OK SO HERE WE EXECUTE Everything in a Chain of Responsibility thingy
-            // So Up first is to know what this maret name is.
-            // Next We need to parse fix to understand if it is a BUY / a Sell FIX message
-            // Lastly We need to update the Client (via router -- set the ID to be that of broker that sent message (FIX))
-            // In the background on another thread a Market will be changed  + or -  // if - larger than X deregister market
-            System.out.println("Message received from Server: " + result + " Message length= " + result.length());
+            ParseFix(result);
+            System.out.println("Process: "  + result);
         }
         if (this.key.isWritable()) {
-            if (!thread.MsgQueue.isEmpty())
-            {
-                String msg = null;
-                SocketChannel sc = (SocketChannel) key.channel();
-                ByteBuffer bb = null;
-       
+            String msg = null;
+            SocketChannel sc = (SocketChannel) key.channel();
+            ByteBuffer bb = null;
+
+            if (firstConnect) {
+                msg = '[' + UUID + "] " + "REGISTER-MARKET " + _MarketClient.getName();
+                bb = ByteBuffer.wrap(msg.getBytes());
+                sc.write(bb);
+                firstConnect = false;
+            }
+
+            // Clean Exit
+            if (!thread.MsgQueue.isEmpty()) {
                 // Itterate through message Queue and Send them
-                for (int i = 0; i < thread.MsgQueue.size(); ++i) { 		      
+                for (int i = 0; i < thread.MsgQueue.size(); ++i) {
                     msg = thread.MsgQueue.get(i);
-                    if (msg.equals("exit") || msg.equals("quit"))
-                    {
+                    if (msg.equals("exit") || msg.equals("quit")) {
                         InputThread.shutdown();
                         sc.close();
                         System.exit(0);
                     }
-                    msg = '[' + UUID + "] " + msg;
-                    bb = ByteBuffer.wrap(msg.getBytes());
-                    sc.write(bb);
-                   
+                    else {
+                        msg = '[' + UUID + "] " + msg;
+                        System.out.println("RESPONSE:" + msg);
+                        bb = ByteBuffer.wrap(msg.getBytes());
+                        sc.write(bb);
+                    }
                 }
                 thread.MsgQueue.clear();
             }
         }
         return false;
     }
+    private String FinalizeFixMessage(String msg, String BrokerClientID) {
+        msg = '|' + msg + "|49=" + BrokerClientID + "|";
+        String fixMsg = "8=FIX.4.2|9=" + (msg.length()) + msg;
+        if (fixMsg != null) {
+            fixMsg += "10=" + GenerateCheckSum(fixMsg) + '|';
+        }
+        return fixMsg;
+    }
 
-        // static
-        public Boolean processConnect( SelectionKey key) {
+    private void ParseFix(String result) {
+        HashMap<String, String> KeyValuePair = new HashMap<>();
+        // 8=FIX.4.2|9=38|35=D|38=10|40=2|44=10|49=B50002|54=1|55=AMD|460=CPU|10=198|
+        // Step 1. Break into segments 
+        String[] msgParts = result.split("\\|");
+        for (String msg :msgParts)
+        {
+            // Step 2. Break into Key Value Pairs
+            String[] Key_Val = msg.split("=");
+            KeyValuePair.put(Key_Val[0], Key_Val[1]);
+        }
+
+        // NEXT STEPS:
+        // Market Instrument Exists?
+        if (KeyValuePair.containsKey("460"))
+        {
+            boolean found = false; 
+            String ProductName = KeyValuePair.get("460");
+            for (Instrument product : _MarketClient.getInstruments())
+            {
+                if (product.getName().equals(ProductName))
+                {
+                    BuyorSell(KeyValuePair.get("38"), KeyValuePair.get("44"),KeyValuePair.get("54"), KeyValuePair.get("49"), product);
+                    found= true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                // Write Instrument Not found To router
+                String msg = "35=8|39=2|55=" + _MarketClient.getName() + "|58=We Do not have such a Instrument";
+                String Fixresponse = FinalizeFixMessage(msg,  KeyValuePair.get("49"));
+                thread.MsgQueue.add(Fixresponse);
+            }
+        }
+    }
+
+    private void BuyorSell(String sShareAmount, String sPrice, String BuyorSell, String BrokerID, Instrument product) {
+        int shareAmount = 0;
+        Float Price = 0.0f;
+        try {
+            shareAmount= Integer.parseInt(sShareAmount);
+            Price = Float.parseFloat(sPrice);
+        }
+        catch (NumberFormatException nfe) {
+            log.error("Error BUY-or-SELL:" + nfe.getMessage());
+        }
+        // BUY
+        if (BuyorSell.equals("1"))
+            BuyShares(product, shareAmount, Price, BrokerID);
+        // SELL
+        if (BuyorSell.equals("2"))
+            SellShares(product, shareAmount, Price, BrokerID);
+    }
+
+    public Boolean processConnect(SelectionKey key) {
             SocketChannel sc = (SocketChannel) key.channel();
            try {
                while (sc.isConnectionPending()) {
@@ -128,7 +195,6 @@ public class MarketClient {
                sc.read(bb);
                this.UUID = new String(bb.array()).trim();
                log.info(this.UUID);
-   
            } catch ( IOException e) {
                key.cancel();
                e.printStackTrace();
@@ -137,18 +203,61 @@ public class MarketClient {
            return true;
        }
 
-    //    OK SO TO BUY SHARES : 
-    public String BuyShares(Instrument ins, int ShareAmount, int Price) {
-        return "NOPE";
+
+    //    SINCE THIS IS A PRICE LIMIT, WE'll be getting the max amount of shares for the price but stop if we hit max
+    public int GetMaxShares(float captial, float ppu, int max) {
+        int Amount = (int)Math.floor(captial / ppu);
+        return (Amount > max) ? max : Amount; 
     }
 
-    public String SellShares(Instrument ins, int ShareAmount, int Price) {
-        return "YOu get nothing";
+    private String GenerateCheckSum(String fixmsg)
+    {
+        int sum=0;
+        char[] bs = fixmsg.toCharArray();
+        for (char b : bs)
+            sum += (b == '|') ? 1 : b;
+        return String.format("%03d" , sum % 256);
+    } 
+
+    public void BuyShares(Instrument ins, int ShareAmount, Float Price, String BrokerID) {
+        int MaxSharesAmount = GetMaxShares(Price, ins.getPrice(), ShareAmount);
+        if (MaxSharesAmount <= 0 || MaxSharesAmount > ins.getShares())
+        {
+            String msg = "35=8|39=2|55=" + _MarketClient.getName() + "|58=We can not provide you with this amount of shares|460=" + ins.getName();
+            String Fixresponse = FinalizeFixMessage(msg,  BrokerID);
+            thread.MsgQueue.add(Fixresponse);
+        }
+        else {
+            // Write Back Success and remove some shares :D 
+            float totalPrice = MaxSharesAmount * ins.getPrice();
+            String msg = "|35=8|39=10|55=" + _MarketClient.getName() + "|58=You've Bought " + MaxSharesAmount + " instruments of "+ ins.getName() + " at :" + totalPrice + "|460=" + ins.getName();
+            String Fixresponse = FinalizeFixMessage(msg,  BrokerID);
+            thread.MsgQueue.add(Fixresponse);
+
+            ins.setShares(ins.getShares() - MaxSharesAmount);
+        }
     }
 
-    public boolean sameName(String Name) {
-        return Name.equals(this._MarketClient.getName());
+    public void SellShares(Instrument ins, int ShareAmount, Float Price, String BrokerID) {
+        // Max Shares to sell
+        int MaxSharesAmount = GetMaxShares(Price, ins.getPrice(), ShareAmount);
+        if (MaxSharesAmount <= 0 || MaxSharesAmount > ins.getShares() || (MaxSharesAmount + ins.getShares()) > ins.getMaxShares())
+        {
+            String msg = "|35=8|39=2|55=" + _MarketClient.getName() + "|58=We can not buy this amount of this instrument from you" + "|460=" + ins.getName();
+            String Fixresponse = FinalizeFixMessage(msg,  BrokerID);
+            thread.MsgQueue.add(Fixresponse);
+        }
+        else {
+            // Write Back Success and add some shares :D 
+            float totalPrice = MaxSharesAmount * ins.getPrice();
+            String msg = "|35=8|39=10|55=" + _MarketClient.getName() + "|58=You've Sold " + MaxSharesAmount + " instruments of "+ ins.getName() + " at :" + totalPrice + "|460=" + ins.getName();           
+            String Fixresponse = FinalizeFixMessage(msg,  BrokerID);
+            thread.MsgQueue.add(Fixresponse);
+
+            ins.setShares(ins.getShares() + MaxSharesAmount);
+        }
     }
+
 }
 
 @Log4j

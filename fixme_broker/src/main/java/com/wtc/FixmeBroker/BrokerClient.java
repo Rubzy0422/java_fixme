@@ -16,18 +16,22 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import lombok.Data;
 import lombok.extern.log4j.Log4j;
 
 /*
  * @author Ruben
  */
 @Log4j
+@Data
 public class BrokerClient {
     protected String UUID;
     protected SelectionKey key = null;
@@ -45,7 +49,7 @@ public class BrokerClient {
         sc.register(selector, SelectionKey.OP_CONNECT | SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 
         InputThread = Executors.newSingleThreadExecutor();
-        thread = new InputThread();
+        thread = new InputThread(this);
 
         // START INPUT THREAD 
         InputThread.execute(thread);
@@ -96,11 +100,11 @@ public class BrokerClient {
             }
         }
         if (this.key.isReadable()) {
-             SocketChannel sc = (SocketChannel) this.key.channel();
-             ByteBuffer bb = ByteBuffer.allocate(1024);
+            SocketChannel sc = (SocketChannel) this.key.channel();
+            ByteBuffer bb = ByteBuffer.allocate(1024);
             sc.read(bb);
-             String result = new String(bb.array()).trim();
-            System.out.println("Message received from Server: " + result + " Message length= " + result.length());
+            String result = new String(bb.array()).trim();
+            // System.out.println(result);
         }
         if (this.key.isWritable()) {
             if (!thread.MsgQueue.isEmpty())
@@ -112,7 +116,7 @@ public class BrokerClient {
                 // Itterate through message Queue and Send them
                 for (int i = 0; i < thread.MsgQueue.size(); ++i) { 		      
                     msg = thread.MsgQueue.get(i);
-                    if (msg.equals("exit") || msg.equals("quit"))
+                    if (msg.equals("STOP"))
                     {
                         InputThread.shutdown();
                         sc.close();
@@ -134,44 +138,223 @@ public class BrokerClient {
 class InputThread implements Runnable {
     private static BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
     public List<String> MsgQueue = new ArrayList<String>();
+    private BrokerClient bc;
+
+    public InputThread(BrokerClient brokerClient) {
+        this.bc = brokerClient;
+    }
+
+    private String GenerateCheckSum(String fixmsg)
+    {
+        int sum=0;
+        char[] bs = fixmsg.toCharArray();
+        for (char b : bs)
+            sum += (b == '|') ? 1 : b;
+        return String.format("%03d" , sum % 256);
+    } 
 
     @Override
     public void run() {
-        // 8=FIX4.2|9=65|35=D|54=1|38=100|52=20071123-05:30:00.000|55=IBM|40=1|10=000
+  
         String msg;
         while (true) {
             System.out.print("Message: ");
-
-            // CALCULATE FIX BODY LENGTH
-            // SET NEW ORDER SINGLE
-            // 35 =  D (New Single order)
-            // 38 100  Quantity
-
-            // COMMANDS :
-            // BUY MARKET AMOUNT PRICE 
-
-            // SELL MARKET AMOUNT PRICE
-
-
-            // 8=FIX.4.4| 9=(BODYLENGTH) 35= (Message Type), 49 (SenderCompID), 56 (TargetCompID)
-
-            // Body length is the character count starting at tag 35 (included) all the way to tag 10 (excluded). SOH delimiters do count in body length.
-            // For Example: (SOH have been replaced by'|')
-
-            // 8=FIX.4.2|9=65|35=A|49=SERVER|56=CLIENT|34=177|52=20090107-18:15:16|98=0|108=30|10=062|
-            //      0   + 0  + 5  +   10    +   10    +  7   +        21          + 5  +  7   +   0    = 65
-
-            // Checksum = All chars except last % 256 = 
-
-           try {
-                
-                msg = input.readLine();
-                
-                String fixMsg = "8=FIX4.2|9=" + msg.length() + '|' + msg + "|10=";
-                MsgQueue.add(fixMsg);
-            } catch ( IOException e) {
+            try {
+                msg = input.readLine().replace(" ", "");
+                if (msg.equalsIgnoreCase("Exit") || msg.equalsIgnoreCase("Quit") || msg.equalsIgnoreCase("Stop"))
+                {
+                    MsgQueue.add("STOP");
+                }
+                else {
+                    msg = '|' + msg + "|40=2|" + "49=" + bc.getUUID() + "|";
+                    String fixMsg = "8=FIX.4.2|9=" + (msg.length()) + msg;
+                    fixMsg = checktagvalues(fixMsg);
+                    if (fixMsg != null) {
+                        fixMsg += "10=" + GenerateCheckSum(fixMsg) + '|';
+                        MsgQueue.add(fixMsg);
+                    }
+                }
+            }
+            catch ( IOException e) {
                log.error(e.getMessage());
             }
         }
    }
+
+    private String checktagvalues(String fixMsg) {
+        String[] tags = fixMsg.split("\\|");
+        List<String> requiredTagKeys = new ArrayList<>(Arrays.asList("8", "9", "35", "54", "38", "49", "55", "44", "40", "460")); //Ensure contains buy/sell instrument, market, price
+        HashMap<String, String> recievedTags = new HashMap<String, String>();
+        for (String tag : tags) {
+            String[] tagVal = tag.split("=");
+            if (tagVal.length == 2) {
+                recievedTags.put(tagVal[0], tagVal[1]);
+            }
+        }
+        if (recievedTags.keySet().containsAll(requiredTagKeys)) {
+            // Loop through tags and ensure they have appropriate values :D 
+            boolean validate = true;
+            for (String key : recievedTags.keySet()) {
+                validate = KeySetValueValidate(key, recievedTags.get(key));
+                if (!validate)
+                    break;
+            }
+            if (validate) {
+                return BuildString(recievedTags);
+            }
+            return null;
+        }
+        else {
+            log.error("[WARNING] INVALID MESSAGE, please Ensure to add the tags: [35,38,44,54,55,460]");
+            return null;
+        }
+    }
+
+    private String BuildString(HashMap<String, String> recievedTags) {
+        String[] Key_array = new String[recievedTags.size()];
+        String[] Value_array = new String[recievedTags.size()];
+
+        recievedTags.keySet().toArray(Key_array);
+        recievedTags.values().toArray(Value_array);
+        String str = "";
+        bubbleSort(Key_array, Value_array);
+        for (int i = 0 ; i < Key_array.length; i++) {
+            str += Key_array[i] + '=' + Value_array[i] + '|';
+        }
+        return str;
+    }
+
+    static void bubbleSort(String[] arr1, String[] arr2) {
+        int n = arr1.length;
+        String temp = "";
+        String temp2 = "";
+  
+        for(int i = 0; i < n; i++) {
+           for(int j=1; j < (n-i); j++) {
+            if(  Integer.parseInt(arr1[j-1]) > Integer.parseInt(arr1[j]) ) {
+            //   if(arr1[j-1].compareTo(arr1[j]) > 0) {
+                 temp = arr1[j-1];
+                 temp2 = arr2[j-1];
+
+                 arr1[j-1] = arr1[j];
+                 arr2[j-1] = arr2[j];
+
+                 arr1[j] = temp;
+                 arr2[j] = temp2;
+              }
+           }
+        }
+     }
+
+    private boolean KeySetValueValidate(String key, String value) {
+        switch (key)
+        {
+            case "8": {
+                if (value.equals("FIX.4.2"))
+                    return true;
+                else 
+                {
+                    log.error("[WARNING] only FIX.4.2 Is supported");
+                    return false;
+                }
+            }
+            case "9": {
+                try {
+                    if (Integer.parseInt(value) > 0)
+                        return true;
+                    else {
+                        log.error("[WARNING] Body Length must be positive!");
+                        return false;
+                    }
+                }
+                catch (Exception e) {
+                    return false;
+                }
+            }
+            case "35": {
+                if (value.equals("D") || value.equals("8"))
+                    return true;
+                else {
+                    log.error("[WARNING] Message Type is not supported!");
+                    return false;
+                }
+               
+            }
+            case "54": {
+                if ((value.equals("1") || value.equals("2")))
+                    return true;
+                else {
+                    log.error("[WARNING] Message Must be Buy or sell is not supported!");
+                    return false;
+                }
+            }
+            case "38": {
+                try {
+                    if (Integer.parseInt(value) > 0)
+                        return true;
+                    else {
+                        log.error("[WARNING] Order Quantity must be positive!");
+                        return false;
+                    }
+                }
+                catch (Exception e) {
+                    log.error("[WARNING] Order Quantity must be a positive Number!");
+                    return false;
+                }
+            }
+            case "44": {
+                try {
+                    if ( Float.parseFloat(value) > 0)
+                        return true;
+                    else 
+                    {
+                        log.error("[WARNING] Price must be a positive Number!");
+                        return false;
+                    }
+                }
+                catch (Exception e) {
+                    log.error("[WARNING] Price must be a positive Number!");
+                    return false;
+                }
+            }
+            case "55": {
+                if (!value.isEmpty())
+                    return true;
+                else 
+                    {
+                        log.error("[WARNING] Target Name Must be Entered!");
+                        return false;
+                    }
+            }
+            case "40": {
+                if (value.equals("2"))
+                    return true;
+                else 
+                {
+                    log.error("[WARNING] OrdType Is Not Supported!");
+                    return false;
+                }
+            }
+            case "460": {
+                if (!value.isEmpty())
+                    return true;
+                else 
+                {
+                    log.error("[WARNING] product / Instrument Name Must be Entered!");
+                    return false;
+                }
+            }
+            // case "52": {
+            //     return true;
+            // }
+            case "10": {
+                log.error("[WARNING] Checksum must be calculated don't enter it");
+                return false;
+            }
+            default:
+                return true;
+            // 9 35 54 38 55 40 10 52
+        }
+    }
+
 } 

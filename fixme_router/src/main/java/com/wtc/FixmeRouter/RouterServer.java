@@ -5,9 +5,7 @@
  */
 package com.wtc.FixmeRouter;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -16,7 +14,6 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
 
@@ -44,6 +41,8 @@ public class RouterServer {
     ByteBuffer bb;
     String result;
     String sUUID;
+    boolean firstRead = true;
+    String _port;
     static int i = 50000;
 
     RouterServer(final String _host, final int port) {
@@ -69,11 +68,7 @@ public class RouterServer {
                     key = (SelectionKey) iterator.next();
                     if (key.isAcceptable()) {
                         RegisterNewClient();
-                    }
-                    if (key.isWritable()) {
-                        WriteToClient();
-                    }
-                    
+                    }  
                     if (key.isReadable()) {
                         ReadFromClient();    
                     }
@@ -81,8 +76,6 @@ public class RouterServer {
                     iterator.remove();
                 }
             }
-            // scl.forEach((key, value) -> System.out.println(key + ":" + value));
-
         } catch (final IOException e) {
             log.error(e.getMessage());
         } catch (final CancelledKeyException Cke) {
@@ -92,26 +85,17 @@ public class RouterServer {
 
     private void RegisterNewClient() throws IOException {
         sc = serverSocketChannel.accept();
-        final String _port = sc.getLocalAddress().toString().split(":")[1];
+        _port = sc.getLocalAddress().toString().split(":")[1];
         sc.configureBlocking(false);
         sc.register(selector, SelectionKey.OP_READ);
         if (_port.equals("5001"))
             sUUID = 'M' + Integer.toString(i++);
         else
             sUUID = 'B' + Integer.toString(i++);
+        //  UUID SEND TO CLIENT
         sc.write(ByteBuffer.wrap(sUUID.getBytes()));
         FixmeRouter.scl.put(sUUID, sc);
         log.info("Connection Accepted: " + sUUID + sc.getRemoteAddress() + "  " + sUUID + "\n");
-    }
-
-    private void WriteToClient() throws IOException {
-        System.out.print("Enter Message: ");
-        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
-        String msg = input.readLine();
-        msg = "[SERVER]" + msg;
-        SocketChannel sc = (SocketChannel) key.channel();
-        ByteBuffer bb = ByteBuffer.wrap(msg.getBytes());
-        sc.write(bb);
     }
 
     private void ReadFromClient() throws IOException {
@@ -125,8 +109,8 @@ public class RouterServer {
         {
             String _UUID = result.substring(1, 7);
             String messString = result.substring(9);
-            System.out.println(_UUID + " - [" + messString + ']');
-            cc.process(new ClientMessage(_UUID, messString));
+            // System.out.println(_UUID + " - [" + messString + ']');
+            cc.process(new ClientMessage(cc, _UUID, messString, sc));
         }
         if (result.length() <= 0) {
             sc.close();
