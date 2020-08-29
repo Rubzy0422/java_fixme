@@ -222,7 +222,7 @@ public class MarketClient {
         int MaxSharesAmount = GetMaxShares(Price, ins.getPrice(), ShareAmount);
         if (MaxSharesAmount <= 0 || MaxSharesAmount > ins.getShares())
         {
-            String msg = "35=8|39=2|55=" + _MarketClient.getName() + "|58=We can not provide you with this amount of shares|460=" + ins.getName();
+            String msg = "35=8|39=2|55=" + _MarketClient.getName() + "|58=We can not provide you with this amount of instruments, we can provide a saldo of: "+ ins.getShares() +"|460=" + ins.getName();
             String Fixresponse = FinalizeFixMessage(msg,  BrokerID);
             thread.MsgQueue.add(Fixresponse);
         }
@@ -240,9 +240,9 @@ public class MarketClient {
     public void SellShares(Instrument ins, int ShareAmount, Float Price, String BrokerID) {
         // Max Shares to sell
         int MaxSharesAmount = GetMaxShares(Price, ins.getPrice(), ShareAmount);
-        if (MaxSharesAmount <= 0 || MaxSharesAmount > ins.getShares() || (MaxSharesAmount + ins.getShares()) > ins.getMaxShares())
+        if (MaxSharesAmount <= 0 || (MaxSharesAmount + ins.getShares()) > ins.getMaxShares())
         {
-            String msg = "35=8|39=2|55=" + _MarketClient.getName() + "|58=We can not buy this amount of this instrument from you" + "|460=" + ins.getName();
+            String msg = "35=8|39=2|55=" + _MarketClient.getName() + "|58=We can not buy this amount of this instruments from you We can buy a saldo of:" + (ins.getMaxShares() - ins.getShares()) + "|460=" + ins.getName();
             String Fixresponse = FinalizeFixMessage(msg,  BrokerID);
             thread.MsgQueue.add(Fixresponse);
         }
@@ -271,7 +271,8 @@ class InputThread implements Runnable {
             System.out.print("Message: ");
             try {
                 msg = input.readLine();
-                MsgQueue.add(msg);
+                if (msg.equals("exit") || msg.equals("quit"))
+                    MsgQueue.add(msg);
             } catch ( IOException e) {
                log.error(e.getMessage());
             }

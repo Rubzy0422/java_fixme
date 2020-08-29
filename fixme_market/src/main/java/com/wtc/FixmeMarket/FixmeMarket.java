@@ -5,12 +5,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.UnknownHostException;
 
-import lombok.extern.log4j.Log4j;
-
 /**
  * @author Ruben
  */
-@Log4j
 public class FixmeMarket {
     public FixmeMarket() {
         System.out.println("Please Select a host:");
@@ -19,7 +16,6 @@ public class FixmeMarket {
             String host = buffreader.readLine().trim();
             System.out.println("Please Provide a MarketID followed by Instruments (defined as [Name:Price:StockCount] splitted by spaces)");
             MarketObj Marketclient = createMarket(buffreader);
-            // System.out.println(host + " " + MarketName + " " + Instruments);
 
             
             if (!host.isEmpty() && Marketclient != null && Marketclient.Instruments.size() > 0)

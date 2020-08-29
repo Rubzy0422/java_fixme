@@ -109,6 +109,7 @@ public class RouterServer {
         {
             String _UUID = result.substring(1, 7);
             String messString = result.substring(9);
+            log.info("[" + _UUID + "]\t" + messString);
             cc.process(new ClientMessage(cc, _UUID, messString, sc));
         }
         if (result.length() <= 0) {

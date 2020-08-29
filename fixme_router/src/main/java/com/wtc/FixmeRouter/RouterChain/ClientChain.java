@@ -43,7 +43,7 @@ abstract class Processor
     };  
 }  
 
-@Log4j
+
 class BrokerProcessor extends Processor  
 {  
     public BrokerProcessor(Processor processor){ 
@@ -53,8 +53,7 @@ class BrokerProcessor extends Processor
     public void process(ClientMessage request)  
     {  
         if (request.getClient().startsWith("B"))  
-        {  
-            log.info('[' + request.getClient() + ']' + request.getMessage());
+        { 
             request.getCc().ForwardChain();
             request.getCc().process(request);
             // super.process(request);
@@ -63,11 +62,9 @@ class BrokerProcessor extends Processor
         {  
             super.process(request);  
         }
-        log.info(request.getClient() + request.getMessage());
     }  
 }  
 
-@Log4j
 class MarketProcessor extends Processor  
 {  
     public MarketProcessor(Processor processor){ 
@@ -77,8 +74,7 @@ class MarketProcessor extends Processor
     public void process(ClientMessage request)  
     {
         if (request.getClient().startsWith("M"))  
-        {  
-            // REGISTER MARKET NAME 
+        {
             if (!request.getMessage().isEmpty())
             {
                 String[] MessageParts = request.getMessage().split(" ");
@@ -91,7 +87,7 @@ class MarketProcessor extends Processor
                     request.getCc().process(request);
                 }
             }  
-            log.info(request.getClient() + request.getMessage());
+           
         }  
         else
         {  

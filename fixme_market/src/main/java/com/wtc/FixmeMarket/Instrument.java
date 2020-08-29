@@ -1,10 +1,8 @@
 package com.wtc.FixmeMarket;
 
 import lombok.Data;
-import lombok.extern.log4j.Log4j;
 
 @Data
-@Log4j
 public class Instrument {
 	String Name;
     float Price;
@@ -15,11 +13,11 @@ public class Instrument {
         this.Name = Name;
         this.Price = Price;
         this.Shares = Shares;
-        this.MaxShares = GenerateMaxShares();
+        this.MaxShares = 1000;
 	}
 
-    private int GenerateMaxShares() {
-        int randnum = (int) Math.random() * 1000;
-        return (randnum > 0) ? randnum : 1;
-    }
+    // private int GenerateMaxShares() {
+    //     int randnum = (int) Math.random() * 1000;
+    //     return (randnum > 0) ? randnum : 1;
+    // }
 }
