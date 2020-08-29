@@ -54,14 +54,16 @@ class BrokerProcessor extends Processor
     {  
         if (request.getClient().startsWith("B"))  
         {  
-            log.info("BrokerProcessor UUID: " + request.getClient());
+            log.info('[' + request.getClient() + ']' + request.getMessage());
             request.getCc().ForwardChain();
-            super.process(request);
+            request.getCc().process(request);
+            // super.process(request);
         }  
         else
         {  
             super.process(request);  
-        }  
+        }
+        log.info(request.getClient() + request.getMessage());
     }  
 }  
 
@@ -73,7 +75,7 @@ class MarketProcessor extends Processor
     } 
   
     public void process(ClientMessage request)  
-    {  
+    {
         if (request.getClient().startsWith("M"))  
         {  
             // REGISTER MARKET NAME 
@@ -82,11 +84,14 @@ class MarketProcessor extends Processor
                 String[] MessageParts = request.getMessage().split(" ");
                 if (MessageParts[0].equals("REGISTER-MARKET")) {
                     FixmeRouter.getMarketNameLinks().put(MessageParts[1], request.getSc());
+                    super.process(request);
                 }
-                request.getCc().ForwardChain();
-                super.process(request);
+                else {
+                    request.getCc().ForwardChain();
+                    request.getCc().process(request);
+                }
             }  
-           log.info("MarketProcessor UUID: " + request.getClient());  
+            log.info(request.getClient() + request.getMessage());
         }  
         else
         {  

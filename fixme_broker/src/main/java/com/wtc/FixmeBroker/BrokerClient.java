@@ -104,7 +104,7 @@ public class BrokerClient {
             ByteBuffer bb = ByteBuffer.allocate(1024);
             sc.read(bb);
             String result = new String(bb.array()).trim();
-            // System.out.println(result);
+            log.info(result);
         }
         if (this.key.isWritable()) {
             if (!thread.MsgQueue.isEmpty())

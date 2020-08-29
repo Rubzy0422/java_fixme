@@ -84,7 +84,6 @@ public class MarketClient {
             sc.read(bb);
             String result = new String(bb.array()).trim();
             ParseFix(result);
-            System.out.println("Process: "  + result);
         }
         if (this.key.isWritable()) {
             String msg = null;
@@ -110,7 +109,7 @@ public class MarketClient {
                     }
                     else {
                         msg = '[' + UUID + "] " + msg;
-                        System.out.println("RESPONSE:" + msg);
+                        log.info(msg);
                         bb = ByteBuffer.wrap(msg.getBytes());
                         sc.write(bb);
                     }
@@ -120,6 +119,7 @@ public class MarketClient {
         }
         return false;
     }
+
     private String FinalizeFixMessage(String msg, String BrokerClientID) {
         msg = '|' + msg + "|49=" + BrokerClientID + "|";
         String fixMsg = "8=FIX.4.2|9=" + (msg.length()) + msg;
@@ -131,7 +131,6 @@ public class MarketClient {
 
     private void ParseFix(String result) {
         HashMap<String, String> KeyValuePair = new HashMap<>();
-        // 8=FIX.4.2|9=38|35=D|38=10|40=2|44=10|49=B50002|54=1|55=AMD|460=CPU|10=198|
         // Step 1. Break into segments 
         String[] msgParts = result.split("\\|");
         for (String msg :msgParts)
@@ -230,7 +229,7 @@ public class MarketClient {
         else {
             // Write Back Success and remove some shares :D 
             float totalPrice = MaxSharesAmount * ins.getPrice();
-            String msg = "|35=8|39=10|55=" + _MarketClient.getName() + "|58=You've Bought " + MaxSharesAmount + " instruments of "+ ins.getName() + " at :" + totalPrice + "|460=" + ins.getName();
+            String msg = "35=8|39=10|55=" + _MarketClient.getName() + "|58=You've Bought " + MaxSharesAmount + " instruments of "+ ins.getName() + " at :" + totalPrice + "|460=" + ins.getName();
             String Fixresponse = FinalizeFixMessage(msg,  BrokerID);
             thread.MsgQueue.add(Fixresponse);
 
@@ -243,14 +242,14 @@ public class MarketClient {
         int MaxSharesAmount = GetMaxShares(Price, ins.getPrice(), ShareAmount);
         if (MaxSharesAmount <= 0 || MaxSharesAmount > ins.getShares() || (MaxSharesAmount + ins.getShares()) > ins.getMaxShares())
         {
-            String msg = "|35=8|39=2|55=" + _MarketClient.getName() + "|58=We can not buy this amount of this instrument from you" + "|460=" + ins.getName();
+            String msg = "35=8|39=2|55=" + _MarketClient.getName() + "|58=We can not buy this amount of this instrument from you" + "|460=" + ins.getName();
             String Fixresponse = FinalizeFixMessage(msg,  BrokerID);
             thread.MsgQueue.add(Fixresponse);
         }
         else {
             // Write Back Success and add some shares :D 
             float totalPrice = MaxSharesAmount * ins.getPrice();
-            String msg = "|35=8|39=10|55=" + _MarketClient.getName() + "|58=You've Sold " + MaxSharesAmount + " instruments of "+ ins.getName() + " at :" + totalPrice + "|460=" + ins.getName();           
+            String msg = "35=8|39=10|55=" + _MarketClient.getName() + "|58=You've Sold " + MaxSharesAmount + " instruments of "+ ins.getName() + " at :" + totalPrice + "|460=" + ins.getName();           
             String Fixresponse = FinalizeFixMessage(msg,  BrokerID);
             thread.MsgQueue.add(Fixresponse);
 
